@@ -1,0 +1,40 @@
+---
+- name: Install kubernetes and dependencies (etcd)
+  yum: name={{item}} state=present
+  with_items:
+      - etcd
+      - kubernetes
+  sudo: yes
+
+- name: Create directory for /etc/pki/kube-apiserver
+  file: path=/etc/pki/kube-apiserver state=directory
+  sudo: yes
+
+- name: Generate service account key for kube-apiserver
+  command: openssl genrsa -out /etc/pki/kube-apiserver/serviceaccount.key 2048
+  sudo: yes
+  when: serviceaccount_key_init_method == "create"
+
+- name: Copy service account key for kube-apiserver
+  copy: src={{serviceaccount_key_file}} dest=/etc/pki/kube-apiserver/serviceaccount.key
+  sudo: yes
+  when: serviceaccount_key_init_method == 'copy'
+
+- name: Update KUBE_API_ARGS in /etc/kubernetes/apiserver
+  command: sed -i.back '/KUBE_API_ARGS=*/c\KUBE_API_ARGS="--service_account_key_file=/etc/pki/kube-apiserver/serviceaccount.key"' /etc/kubernetes/apiserver
+  sudo: yes
+
+- name: Update KUBE_CONTROLLER_MANAGER_ARGS in /etc/kubernetes/controller-manager
+  command: sed -i.back '/KUBE_CONTROLLER_MANAGER_ARGS=*/c\KUBE_CONTROLLER_MANAGER_ARGS="--service_account_private_key_file=/etc/pki/kube-apiserver/serviceaccount.key"' /etc/kubernetes/controller-manager
+  sudo: yes
+
+- name: Start and enable services
+  service: name={{item}} state=restarted enabled=yes
+  with_items:
+    - etcd
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
+    - kube-proxy.service
+    - kubelet.service
+  sudo: yes

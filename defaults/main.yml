@@ -1,0 +1,3 @@
+---
+serviceaccount_key_init_method: create # create/copy
+serviceaccount_key_file: serviceaccount.key.j2
